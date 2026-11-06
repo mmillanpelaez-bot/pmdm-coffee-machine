@@ -1,73 +1,46 @@
 package org.example
 
 /**
- * Bebidas que sabe preparar la máquina (nodos con * del diagrama), su precio y su taza.
- *
- * @property precio precio de la bebida.
- * @property taza taza en la que se sirve (cada tipo de taza es una subclase de [Taza]).
+ * Bebidas de la máquina (nodos con * del esquema), con su precio y su taza.
  */
 enum class Bebida(val precio: Int, val taza: Taza) {
-    CORTADO(1, TazaEspresso()),
+    CORTADO(1, TazaPequena()),
     LARGO(1, TazaGrande()),
-    CAPPUCCINO(2, TazaCappuccino())   // con leche, azúcar, espuma...
+    CAPPUCCINO(2, TazaGrande())   // con leche, azúcar, espuma...
 }
 
 /**
- * Estados de la cafetera, según el esquema hecho en papel (5 estados).
+ * Estados de la cafetera (5, según el esquema en papel).
  *
- * Es una **clase sellada** (`sealed class`): todas las subclases están en este fichero,
- * así que el compilador sabe cuáles son y obliga a que cualquier `when` las cubra todas.
+ * Es una clase sellada: el compilador conoce todos los estados y obliga a que
+ * cada `when` los cubra todos.
  *
- * Criterio para elegir el tipo de cada estado:
- * - `object` -> estado **sin datos**: solo existe una instancia (singleton).
- * - `data class` -> estado **con datos**: cada instancia guarda información distinta
- *   y el compilador genera `equals()`, `hashCode()`, `toString()` y `copy()`.
+ * - `object`: estado sin datos (una única instancia).
+ * - `data class`: estado que guarda información.
  */
 sealed class CoffeeMachineState {
 
-    /** E0 - ERROR (por estado): guarda el estado en el que se produjo y el motivo */
+    /** E0 - Error. Guarda el motivo y el estado donde ocurrió (por eso es `data class`). */
     data class Error(val message: String, val origen: CoffeeMachineState? = null) : CoffeeMachineState()
 
-    /** E1 - Esperando una selección. Guarda desde cuándo espera, por eso es una `data class`. */
-    data class Idle(val timestamp: Long = System.currentTimeMillis()) : CoffeeMachineState()
+    /** E1 - Esperando. No necesita datos (por eso es `object`). */
+    object Idle : CoffeeMachineState() {
+        override fun toString() = "Idle"
+    }
 
     /**
-     * E2 - Procesando selección: comprueba que el saldo sea suficiente,
-     * si no, muestra el precio de la selección.
-     *
-     * **Estado con datos que no estaba en el ejemplo de la práctica.**
+     * E2 - Procesando selección: comprueba el saldo y, si no llega, muestra el precio.
+     * Estado nuevo con datos (la bebida elegida), por eso es `data class`.
      */
     data class ProcessingSelection(val seleccion: Bebida) : CoffeeMachineState()
 
-    /**
-     * Elaborando: un estado por cada bebida del diagrama.
-     * Cada bebida es un `object` porque no necesita datos propios (precio y taza están en [Bebida]).
-     */
+    /** Elaborando: un estado por bebida. Son `object` porque no guardan datos propios. */
     sealed class MakingCoffee(val bebida: Bebida) : CoffeeMachineState() {
         object Cortado : MakingCoffee(Bebida.CORTADO) { override fun toString() = "Cortado" }
         object Largo : MakingCoffee(Bebida.LARGO) { override fun toString() = "Largo" }
         object Cappuccino : MakingCoffee(Bebida.CAPPUCCINO) { override fun toString() = "Cappuccino" }
     }
 
-    /**
-     * E3 - Terminado: comprueba que no haya errores antes de volver a E1.
-     *
-     * @property bebida bebida servida.
-     * @property taza taza en la que se ha servido.
-     */
+    /** E3 - Terminado. Guarda la bebida y la taza (por eso es `data class`). */
     data class Finished(val bebida: Bebida, val taza: Taza = bebida.taza) : CoffeeMachineState()
 }
-
-/**
- * Registro de un cambio de estado. Es una `data class` porque solo agrupa datos;
- * se usa para guardar el **historial de estados** de la máquina.
- *
- * @property from estado anterior.
- * @property to estado nuevo.
- * @property timestamp momento del cambio (milisegundos desde 1970).
- */
-data class StateChange(
-    val from: CoffeeMachineState,
-    val to: CoffeeMachineState,
-    val timestamp: Long = System.currentTimeMillis()
-)
